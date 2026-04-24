@@ -79,10 +79,26 @@ def build_image_payload_candidates(
             "module": "text2image",
             "submodule": "ff-image-generate",
         }
-        c3["modelSpecificPayload"] = {"parameters": {"addWatermark": False}}
+        c3["modelSpecificPayload"] = {
+            "parameters": {"addWatermark": False},
+            "aspectRatio": aspect_ratio,
+        }
         c3.pop("skipCai", None)
 
-        return [c1, c2, c3]
+        c4 = dict(base_payload)
+        c4["referenceBlobs"] = []
+        c4["generationMetadata"] = {
+            "module": "text2image",
+            "submodule": "ff-image-generate",
+        }
+        c4["modelSpecificPayload"] = {
+            "parameters": {"addWatermark": False},
+            "aspectRatio": aspect_ratio,
+        }
+        c4.pop("skipCai", None)
+        c4.pop("groundSearch", None)
+
+        return [c4, c3, c2, c1]
 
     candidates: list[dict] = []
     edited = dict(base_payload)
