@@ -58,7 +58,7 @@ class AdobeClient:
         self.retry_enabled = True
         self.retry_max_attempts = 3
         self.retry_backoff_seconds = 1.0
-        self.retry_on_status_codes = [429, 451, 500, 502, 503, 504]
+        self.retry_on_status_codes = [408, 429, 451, 500, 502, 503, 504]
         self.retry_on_error_types = {"timeout", "connection", "proxy"}
         self.token_rotation_strategy = "round_robin"
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
@@ -115,7 +115,7 @@ class AdobeClient:
         self.retry_backoff_seconds = max(0.0, min(backoff, 30.0))
 
         status_codes_raw = cfg.get(
-            "retry_on_status_codes", [429, 451, 500, 502, 503, 504]
+            "retry_on_status_codes", [408, 429, 451, 500, 502, 503, 504]
         )
         parsed_status_codes: list[int] = []
         if isinstance(status_codes_raw, list):
@@ -126,7 +126,12 @@ class AdobeClient:
                     continue
                 if 100 <= val <= 599:
                     parsed_status_codes.append(val)
+        # Upstream may return HTTP 408 with timeout_error/system under load.
+        # Keep it retryable by default for backward compatibility.
+        if 408 not in parsed_status_codes:
+            parsed_status_codes.append(408)
         self.retry_on_status_codes = sorted(set(parsed_status_codes)) or [
+            408,
             429,
             451,
             500,
@@ -494,7 +499,7 @@ class AdobeClient:
         if resp.status_code in (401, 403):
             raise AuthError("Token invalid or expired")
         if resp.status_code != 200:
-            if resp.status_code in (429, 451) or resp.status_code >= 500:
+            if resp.status_code in (408, 429, 451) or resp.status_code >= 500:
                 raise UpstreamTemporaryError(
                     f"upload image failed: {resp.status_code} {resp.text[:300]}",
                     status_code=resp.status_code,
@@ -824,7 +829,7 @@ class AdobeClient:
             raise AuthError("Token invalid or expired")
 
         if submit_resp.status_code != 200:
-            if submit_resp.status_code in (429, 451) or submit_resp.status_code >= 500:
+            if submit_resp.status_code in (408, 429, 451) or submit_resp.status_code >= 500:
                 raise UpstreamTemporaryError(
                     f"video submit failed: {submit_resp.status_code} {submit_resp.text[:300]}",
                     status_code=submit_resp.status_code,
@@ -864,7 +869,7 @@ class AdobeClient:
             if poll_resp.status_code in (401, 403):
                 raise AuthError("Token invalid or expired")
             if poll_resp.status_code != 200:
-                if poll_resp.status_code in (429, 451) or poll_resp.status_code >= 500:
+                if poll_resp.status_code in (408, 429, 451) or poll_resp.status_code >= 500:
                     raise UpstreamTemporaryError(
                         f"video poll failed: {poll_resp.status_code} {poll_resp.text[:300]}",
                         status_code=poll_resp.status_code,
@@ -1023,7 +1028,7 @@ class AdobeClient:
                 submit_resp.status_code,
                 submit_resp.text[:500],
             )
-            if submit_resp.status_code in (429, 451) or submit_resp.status_code >= 500:
+            if submit_resp.status_code in (408, 429, 451) or submit_resp.status_code >= 500:
                 raise UpstreamTemporaryError(
                     f"submit failed: {submit_resp.status_code} {submit_resp.text[:300]}",
                     status_code=submit_resp.status_code,
@@ -1072,7 +1077,7 @@ class AdobeClient:
                     poll_resp.status_code,
                     poll_resp.text[:500],
                 )
-                if poll_resp.status_code in (429, 451) or poll_resp.status_code >= 500:
+                if poll_resp.status_code in (408, 429, 451) or poll_resp.status_code >= 500:
                     raise UpstreamTemporaryError(
                         f"poll failed: {poll_resp.status_code} {poll_resp.text[:300]}",
                         status_code=poll_resp.status_code,
